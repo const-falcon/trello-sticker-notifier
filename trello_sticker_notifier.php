@@ -40,7 +40,12 @@ class TrelloStampNotifier
             return;
         }
 
+        // カード一覧を取得
         $cards = $this->getCardsInBoard();
+        // カードIDを抜き出す
+        $cardIds = $this->extractCardIds($cards);
+        // 対象のstickerが貼られているカードの最新コメントを取得
+        $latestComments = $this->getLatestComments($cardIds);
     }
 
     /**
@@ -76,14 +81,41 @@ class TrelloStampNotifier
     }
 
     /**
-     * ボードIDを指定してカードを取得
+     * カード一覧を取得
      *
-     * @return array|null ボード上のカード情報
+     * @return array|null ボード上のカード一覧
      */
     private function getCardsInBoard(): ?array
     {
         $url = "https://api.trello.com/1/boards/{$this->trelloBoardId}/cards?key={$this->trelloApiKey}&token={$this->trelloApiToken}";
         return $this->curlExec($url);
+    }
+
+    /**
+     * カードIDを抜き出す
+     *
+     * @param array|null $cards カード情報
+     *
+     * @return array|null カードID
+     */
+    private function extractCardIds(?array $cards): ?array
+    {
+        if (!isset($cards)) {
+            return null;
+        }
+        return array_column($cards, "id");
+    }
+
+    /**
+     * 対象のstickerが貼られているカードの最新コメントを取得
+     *
+     * @return array|null
+     */
+    private function getLatestComments(?array $cardIds): ?array
+    {
+        if (!isset($cardIds)) {
+            return null;
+        }
     }
 
     /**

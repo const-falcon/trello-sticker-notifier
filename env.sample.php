@@ -6,7 +6,7 @@
 const TRELLO_API_KEY = "TRELLO_API_KEY";
 const TRELLO_API_TOKEN = "TRELLO_API_TOKEN";
 const TRELLO_BOARD_ID = "TRELLO_BOARD_ID";  // URLから取得できる
-const TRELLO_STICKER_ID = "TRELLO_STICKER_ID";
+const TRELLO_STICKER_ID = "TRELLO_STICKER_ID";  // debug mode (第1引数を指定) で起動して取得する
 
 /**
  * Slack
