@@ -12,9 +12,13 @@ class TrelloStampNotifier
     /* @var string ボードID */
     private string $trelloBoardId = TRELLO_BOARD_ID;
 
+    /* @var string ステッカーID */
+    private string $trelloStickerId = TRELLO_STICKER_ID;
+
     /* @var string Slack通知時に使うWebhook URL */
     private string $slackWebhookUrl = SLACK_WEBHOOK_URL;
 
+    // TODO: 嘘コメントどうにかする
     /* @var bool trueならTrelloのボード情報などを出力するだけ */
     private bool $isDebugMode;
 
@@ -35,17 +39,24 @@ class TrelloStampNotifier
      */
     public function main(): void
     {
+        // debug mode
         if ($this->isDebugMode) {
             $this->debug();
+            echo "debug modeで起動\n";
             return;
         }
 
         // カード一覧を取得
         $cards = $this->getCardsInBoard();
+        if (!isset($cards)) {
+            echo "カードがないよ\n";
+            return;
+        }
+
         // カードIDを抜き出す
         $cardIds = $this->extractCardIds($cards);
-        // 対象のstickerが貼られているカードの最新コメントを取得
-        $latestComments = $this->getLatestComments($cardIds);
+        // 対象のステッカーが貼られたカードの最新コメントを取得
+        $latestComments = $this->getLatestCommentsForStickerCard($cardIds);
     }
 
     /**
@@ -94,28 +105,80 @@ class TrelloStampNotifier
     /**
      * カードIDを抜き出す
      *
-     * @param array|null $cards カード情報
+     * @param array $cards カード情報
      *
-     * @return array|null カードID
+     * @return array カードID
      */
-    private function extractCardIds(?array $cards): ?array
+    private function extractCardIds(array $cards): array
     {
-        if (!isset($cards)) {
-            return null;
-        }
         return array_column($cards, "id");
     }
 
     /**
-     * 対象のstickerが貼られているカードの最新コメントを取得
+     * 対象のステッカーが貼られたカードの最新コメントを取得
      *
-     * @return array|null
+     * @param array $cardIds カードID
+     *
+     * @return array $latestComments keyがカードID、valueが最新コメント
      */
-    private function getLatestComments(?array $cardIds): ?array
+    private function getLatestCommentsForStickerCard(array $cardIds): array
     {
-        if (!isset($cardIds)) {
-            return null;
+        $latestComments = [];
+        foreach ($cardIds as $cardId) {
+            $stickerIds = $this->getStickerIds($cardId);
+            // ステッカーがない || 対象のステッカーがない
+            if (empty($stickerIds) || in_array($this->trelloStickerId, $stickerIds, true)) {
+                continue;
+            }
+
+            $latestComment = $this->getLatestComment($cardId);
+            // コメントがない
+            if (!isset($latestComment)) {
+                continue;
+            }
+            $latestComments[$cardId] = $latestComment;
         }
+        return $latestComments;
+    }
+
+    /**
+     * カードに貼られたステッカーIDを取得
+     *
+     * @param string $cardId カードID
+     *
+     * @return array|null ステッカーID
+     */
+    private function getStickerIds(string $cardId): array
+    {
+        $url = "https://api.trello.com/1/cards/{$cardId}/stickers?key={$this->trelloApiKey}&token={$this->trelloApiToken}";
+        $stickers = $this->curlExec($url);
+        return array_column($stickers, "id");
+    }
+
+    /**
+     * 最新コメントを取得
+     *
+     * @param string $cardId カードID
+     *
+     * @return string|null $latestComment 最新コメント
+     */
+    private function getLatestComment(string $cardId): ?string
+    {
+        // コメントはアクションの一種、らしい
+        // https://stackoverflow.com/questions/10242393/trello-api-get-card-comments
+        $url = "https://api.trello.com/1/cards/{$cardId}/actions?key={$this->trelloApiKey}&token={$this->trelloApiToken}";
+        $actions = $this->curlExec($url);
+
+        $latestComment = null;
+        foreach ($actions as $a) {
+            if (!isset($a['data']['text'])) {
+                continue;
+            }
+            // 一番上にあるものが最新
+            $latestComment = $a['data']['text'];
+            break;
+        }
+        return $latestComment;
     }
 
     /**
