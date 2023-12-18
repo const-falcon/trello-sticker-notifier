@@ -1,7 +1,7 @@
 <?php
 require_once("./env.php");
 
-class TrelloStampNotifier
+class TrelloStickerNotifier
 {
     /* @var string Trello API利用時のKey */
     private string $trelloApiKey = TRELLO_API_KEY;
@@ -13,7 +13,7 @@ class TrelloStampNotifier
     private string $trelloBoardId = TRELLO_BOARD_ID;
 
     /* @var string ステッカーID */
-    private string $trelloStickerId = TRELLO_STICKER_ID;
+    private string $trelloStickerImage = TRELLO_STICKER_IMAGE;
 
     /* @var string Slack通知時に使うWebhook URL */
     private string $slackWebhookUrl = SLACK_WEBHOOK_URL;
@@ -127,9 +127,8 @@ class TrelloStampNotifier
     {
         $latestComments = [];
         foreach ($cardIds as $cardId) {
-            $stickerIds = $this->getStickerIds($cardId);
-            // ステッカーがない || 対象のステッカーがない
-            if (empty($stickerIds) || in_array($this->trelloStickerId, $stickerIds, true)) {
+            $stickerImages = $this->getStickerImages($cardId);
+            if (empty($stickerImages) || !in_array($this->trelloStickerImage, $stickerImages, true)) {
                 continue;
             }
             $latestComments[$cardId] = $this->getLatestComment($cardId);
@@ -142,13 +141,13 @@ class TrelloStampNotifier
      *
      * @param string $cardId カードID
      *
-     * @return array|null ステッカーID
+     * @return array|null ステッカー画像
      */
-    private function getStickerIds(string $cardId): array
+    private function getStickerImages(string $cardId): array
     {
         $url = "https://api.trello.com/1/cards/{$cardId}/stickers?key={$this->trelloApiKey}&token={$this->trelloApiToken}";
         $stickers = $this->curlExec($url);
-        return array_column($stickers, "id");
+        return array_column($stickers, "image");
     }
 
     /**
@@ -222,5 +221,5 @@ if (realpath($_SERVER['SCRIPT_FILENAME']) === __FILE__) {
     }
 
     $isDebugMode = isset($argv[1]);
-    (new TrelloStampNotifier($isDebugMode))->main();
+    (new TrelloStickerNotifier($isDebugMode))->main();
 }
