@@ -57,6 +57,8 @@ class TrelloStampNotifier
         $cardIds = $this->extractCardIds($cards);
         // 対象のステッカーが貼られたカードの最新コメントを取得
         $latestComments = $this->getLatestCommentsForStickerCard($cardIds);
+        // Trello情報を整形
+        $formattedTrelloInfo = $this->formatTrelloInfo($cards, $latestComments);
     }
 
     /**
@@ -130,13 +132,7 @@ class TrelloStampNotifier
             if (empty($stickerIds) || in_array($this->trelloStickerId, $stickerIds, true)) {
                 continue;
             }
-
-            $latestComment = $this->getLatestComment($cardId);
-            // コメントがない
-            if (!isset($latestComment)) {
-                continue;
-            }
-            $latestComments[$cardId] = $latestComment;
+            $latestComments[$cardId] = $this->getLatestComment($cardId);
         }
         return $latestComments;
     }
@@ -160,16 +156,16 @@ class TrelloStampNotifier
      *
      * @param string $cardId カードID
      *
-     * @return string|null $latestComment 最新コメント
+     * @return string $latestComment 最新コメント
      */
-    private function getLatestComment(string $cardId): ?string
+    private function getLatestComment(string $cardId): string
     {
         // コメントはアクションの一種、らしい
         // https://stackoverflow.com/questions/10242393/trello-api-get-card-comments
         $url = "https://api.trello.com/1/cards/{$cardId}/actions?key={$this->trelloApiKey}&token={$this->trelloApiToken}";
         $actions = $this->curlExec($url);
 
-        $latestComment = null;
+        $latestComment = "";
         foreach ($actions as $a) {
             if (!isset($a['data']['text'])) {
                 continue;
@@ -179,6 +175,33 @@ class TrelloStampNotifier
             break;
         }
         return $latestComment;
+    }
+
+    /**
+     * Trello情報を整形
+     *
+     * @param array $cards          カード一覧
+     * @param array $latestComments 最新コメント
+     *
+     * @return array $result 整形したTrello情報
+     */
+    private function formatTrelloInfo(array $cards, array $latestComments): array
+    {
+        $result = [];
+        foreach ($cards as $card) {
+            $cardId = $card['id'];
+            if (!isset($latestComments[$cardId])) {
+                continue;
+            }
+
+            // TODO: 今は要らないが、担当者も欲しい気がする
+            $result[$cardId] = [
+                "name"           => $card['name'],
+                "short_url"      => $card['shortUrl'],
+                "latest_comment" => $latestComments[$cardId],
+            ];
+        }
+        return $result;
     }
 
     /**
